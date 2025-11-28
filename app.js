@@ -275,7 +275,10 @@ app.post("/api/reset-db", (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
+  app.listen(PORT, () => {
   console.log(`🚀 Silo Monitor Server running at http://localhost:${PORT}`);
   console.log(`📊 Dashboard: http://localhost:${PORT}`);
   console.log(`🔄 Reset DB: http://localhost:${PORT}/api/reset-db`);
+});
+
 });
