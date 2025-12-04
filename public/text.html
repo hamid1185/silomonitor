@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -44,27 +45,6 @@
       align-items: center;
       font-size: 0.875rem;
       color: #94a3b8;
-    }
-    
-    .refresh-btn {
-      background: #3b82f6;
-      color: white;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    
-    .refresh-btn:hover {
-      background: #2563eb;
-    }
-    
-    .refresh-btn:active {
-      transform: scale(0.98);
     }
     
     .container {
@@ -288,9 +268,6 @@
       right: 24px;
       font-size: 0.75rem;
       color: #64748b;
-      background: rgba(15, 23, 42, 0.8);
-      padding: 4px 8px;
-      border-radius: 4px;
     }
     
     .modal {
@@ -330,35 +307,6 @@
       .node-metrics {
         grid-template-columns: 1fr;
       }
-      
-      .topbar {
-        flex-direction: column;
-        gap: 12px;
-        align-items: stretch;
-      }
-      
-      .topbar-right {
-        justify-content: space-between;
-      }
-    }
-    
-    .loading {
-      opacity: 0.7;
-      pointer-events: none;
-    }
-    
-    .spinner {
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-radius: 50%;
-      border-top-color: white;
-      animation: spin 1s ease-in-out infinite;
-    }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
     }
   </style>
 </head>
@@ -369,10 +317,6 @@
     </div>
     <div class="topbar-right">
       <span>Last updated: <span id="lastUpdated">-</span></span>
-      <button class="refresh-btn" onclick="refreshAll()">
-        <span class="spinner" id="refreshSpinner" style="display: none;"></span>
-        🔄 Refresh
-      </button>
     </div>
   </div>
 
@@ -391,7 +335,7 @@
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Critical Alerts</div>
-        <div class="kpi-value"><span id="criticalAlertsKpi" class="status-online">0</span></div>
+        <div class="kpi-value"><span id="criticalAlertsKpi" class="status-offline">0</span></div>
         <div class="kpi-secondary" id="criticalDetail">No critical alerts</div>
       </div>
       <div class="kpi-card">
@@ -420,7 +364,7 @@
       </div>
       <div class="analytics-grid" id="analyticsGrid">
         <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #64748b;">
-          Loading analytics...
+          Select a device to view predictive analytics
         </div>
       </div>
     </div>
@@ -444,81 +388,25 @@
     let devicesData = {};
     let latestReadings = {};
     let analyticsData = {};
-    let refreshInterval;
     
     async function initDashboard() {
-      console.log('Initializing dashboard...');
       await loadData();
       
-      // Set up auto-refresh every 5 seconds
-      clearInterval(refreshInterval);
-      refreshInterval = setInterval(loadData, 5000);
-      
-      // Update timestamp every second
+      setInterval(loadData, 5000);
       setInterval(updateTimestamp, 1000);
       
       updateTimestamp();
     }
     
     async function loadData() {
-      try {
-        console.log('Loading data...');
-        await Promise.all([
-          loadStats(),
-          loadDevices(),
-          loadLatestReadings()
-        ]);
-        
-        await renderNodeCards();
-        await loadAnalytics();
-        
-        console.log('Data loaded successfully');
-      } catch (error) {
-        console.error('Error loading data:', error);
-        document.getElementById('lastUpdated').textContent = 'Error loading';
-        document.getElementById('lastUpdated').style.color = '#ef4444';
-      }
-    }
-    
-    async function refreshAll() {
-      try {
-        console.log('Manual refresh triggered...');
-        
-        // Show loading state
-        const refreshBtn = document.querySelector('.refresh-btn');
-        const spinner = document.getElementById('refreshSpinner');
-        refreshBtn.disabled = true;
-        spinner.style.display = 'inline-block';
-        document.body.classList.add('loading');
-        
-        document.getElementById('lastUpdated').textContent = 'Refreshing...';
-        document.getElementById('lastUpdated').style.color = '#f59e0b';
-        
-        // Clear existing charts
-        Object.values(charts).forEach(chart => chart.destroy());
-        charts = {};
-        
-        await loadData();
-        
-        // Show success feedback
-        const lastUpdated = document.getElementById('lastUpdated');
-        lastUpdated.textContent = new Date().toLocaleTimeString();
-        lastUpdated.style.color = '#10b981';
-        
-        setTimeout(() => lastUpdated.style.color = '', 2000);
-        
-      } catch (error) {
-        console.error('Refresh failed:', error);
-        document.getElementById('lastUpdated').textContent = 'Error';
-        document.getElementById('lastUpdated').style.color = '#ef4444';
-      } finally {
-        // Restore button state
-        const refreshBtn = document.querySelector('.refresh-btn');
-        const spinner = document.getElementById('refreshSpinner');
-        refreshBtn.disabled = false;
-        spinner.style.display = 'none';
-        document.body.classList.remove('loading');
-      }
+      await Promise.all([
+        loadStats(),
+        loadDevices(),
+        loadLatestReadings()
+      ]);
+      
+      await renderNodeCards();
+      await loadAnalytics();
     }
     
     async function loadStats() {
@@ -544,11 +432,9 @@
       try {
         const response = await fetch('/api/devices');
         const devices = await response.json();
-        devicesData = devices || [];
-        console.log(`Loaded ${devicesData.length} devices`);
+        devicesData = devices;
       } catch (error) {
         console.error('Error loading devices:', error);
-        devicesData = [];
       }
     }
     
@@ -558,115 +444,52 @@
         const readings = await response.json();
         
         latestReadings = {};
-        (readings || []).forEach(reading => {
-          if (reading && reading.deviceId) {
-            latestReadings[reading.deviceId] = reading;
-          }
+        readings.forEach(reading => {
+          latestReadings[reading.deviceId] = reading;
         });
         
-        console.log(`Loaded latest readings for ${Object.keys(latestReadings).length} devices`);
         updateCriticalAlerts();
-        updateAvgHealth(Object.values(latestReadings));
+        updateAvgHealth(readings);
       } catch (error) {
         console.error('Error loading latest readings:', error);
-        latestReadings = {};
       }
     }
     
     async function loadAnalytics() {
-      const analyticsGrid = document.getElementById('analyticsGrid');
-      
-      if (devicesData.length === 0 || Object.keys(latestReadings).length === 0) {
-        analyticsGrid.innerHTML = `
-          <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #64748b;">
-            No devices online. Connect devices to view analytics.
-          </div>
-        `;
-        return;
-      }
-      
-      // Clear previous analytics
-      analyticsGrid.innerHTML = '';
-      analyticsData = {};
-      
-      let hasAnalytics = false;
-      const analyticsPromises = [];
-      
-      // Load analytics for all online devices
       for (const device of devicesData) {
-        if (device.status === 'online' && latestReadings[device.deviceId]) {
-          analyticsPromises.push(loadDeviceAnalytics(device.deviceId));
+        if (device.status === 'online') {
+          await loadDeviceAnalytics(device.deviceId);
         }
-      }
-      
-      // Wait for all analytics to load
-      const results = await Promise.allSettled(analyticsPromises);
-      
-      // Process results
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled' && result.value) {
-          const device = devicesData.find(d => d.status === 'online' && latestReadings[d.deviceId]);
-          if (device) {
-            hasAnalytics = true;
-            renderAnalyticsCard(device.deviceId, result.value);
-          }
-        }
-      });
-      
-      if (!hasAnalytics) {
-        analyticsGrid.innerHTML = `
-          <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #64748b;">
-            No analytics available. Devices need to send more data for analysis.
-          </div>
-        `;
       }
     }
     
     async function loadDeviceAnalytics(deviceId) {
       try {
-        console.log(`Loading analytics for ${deviceId}...`);
         const response = await fetch(`/api/trends/${deviceId}?hours=24`);
-        
-        if (!response.ok) {
-          console.error(`Failed to load analytics for ${deviceId}: ${response.status}`);
-          return null;
-        }
-        
         const analytics = await response.json();
-        
-        // Check if we have sufficient data
-        if (analytics.status === "INSUFFICIENT_DATA" || analytics.message?.includes("Need at least")) {
-          console.log(`Insufficient data for ${deviceId}`);
-          return null;
-        }
-        
         analyticsData[deviceId] = analytics;
-        return analytics;
+        
+        renderAnalyticsCard(deviceId, analytics);
       } catch (error) {
         console.error(`Error loading analytics for ${deviceId}:`, error);
-        return null;
       }
     }
     
     function calculateUptime(firstSeen, lastSeen) {
-      try {
-        const first = new Date(firstSeen);
-        const last = new Date(lastSeen);
-        const diffHours = Math.floor((last - first) / (1000 * 60 * 60));
-        const days = Math.floor(diffHours / 24);
-        const hours = diffHours % 24;
-        
-        if (days > 0) return `${days}d ${hours}h`;
-        return `${hours}h`;
-      } catch (e) {
-        return '0h';
-      }
+      const first = new Date(firstSeen);
+      const last = new Date(lastSeen);
+      const diffHours = Math.floor((last - first) / (1000 * 60 * 60));
+      const days = Math.floor(diffHours / 24);
+      const hours = diffHours % 24;
+      
+      if (days > 0) return `${days}d ${hours}h`;
+      return `${hours}h`;
     }
     
     async function renderNodeCards() {
       const grid = document.getElementById('nodesGrid');
       
-      if (!devicesData || devicesData.length === 0) {
+      if (devicesData.length === 0) {
         grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #64748b;">No devices connected</div>';
         return;
       }
@@ -684,39 +507,30 @@
         return `
           <div class="node-card" ${device.status === 'offline' ? 'style="opacity: 0.6; border-color: #475569;"' : ''}>
             <div class="node-header">
-              <div class="node-title">${device.deviceId || 'Unknown'}</div>
-              <div class="node-status ${statusClass}">${(device.status || 'offline').toUpperCase()}</div>
-            </div>
-            
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 0.8rem;">
-              <div style="display: flex; align-items: center; gap: 4px;">
-                <div style="width: 8px; height: 8px; border-radius: 50%; background: ${device.status === 'online' ? '#10b981' : device.status === 'recent' ? '#f59e0b' : '#64748b'}"></div>
-                <span style="color: #94a3b8;">${device.status || 'offline'}</span>
-              </div>
-              <div style="color: #64748b;">|</div>
-              <div style="color: #94a3b8;">Last: ${device.lastSeen ? new Date(device.lastSeen).toLocaleTimeString() : 'Never'}</div>
+              <div class="node-title">${device.deviceId}</div>
+              <div class="node-status ${statusClass}">${device.status.toUpperCase()}</div>
             </div>
             
             ${reading ? `
               <div class="node-metrics">
                 <div class="metric metric-temp">
-                  <div class="metric-value">${(reading.temperature || 0).toFixed(1)}°C</div>
+                  <div class="metric-value">${reading.temperature?.toFixed(1)}°C</div>
                   <div class="metric-label">Temperature</div>
                 </div>
                 <div class="metric metric-humid">
-                  <div class="metric-value">${(reading.humidity || 0).toFixed(1)}%</div>
+                  <div class="metric-value">${reading.humidity?.toFixed(1)}%</div>
                   <div class="metric-label">Humidity</div>
                 </div>
                 <div class="metric metric-dew">
-                  <div class="metric-value">${(reading.dewPoint || 0).toFixed(1)}°C</div>
+                  <div class="metric-value">${reading.dewPoint?.toFixed(1)}°C</div>
                   <div class="metric-label">Dew Point</div>
                 </div>
                 <div class="metric metric-abs-humid">
-                  <div class="metric-value">${(reading.absoluteHumidity || 0).toFixed(1)} g/m³</div>
+                  <div class="metric-value">${reading.absoluteHumidity?.toFixed(1)} g/m³</div>
                   <div class="metric-label">Abs Humidity</div>
                 </div>
                 <div class="metric metric-mq">
-                  <div class="metric-value">${(reading.mq_value || 0).toFixed(0)}</div>
+                  <div class="metric-value">${reading.mq_value?.toFixed(0)}</div>
                   <div class="metric-label">Air Quality</div>
                 </div>
                 <div class="metric metric-uptime">
@@ -728,7 +542,7 @@
               <div class="risk-section">
                 <div class="risk-label">
                   <span>Spoilage Risk</span>
-                  <span class="risk-value">${(risk || 0).toFixed(1)}%</span>
+                  <span class="risk-value">${risk.toFixed(1)}%</span>
                 </div>
                 <div class="risk-indicator">
                   <div class="risk-bar ${riskClass}" style="width: ${Math.min(risk, 100)}%"></div>
@@ -740,11 +554,11 @@
                   Health: ${health}
                 </div>
                 <div class="health-badge" style="background: #334155; color: #cbd5e1;">
-                  Readings: ${device.readingCount || 0}
+                  Readings: ${device.readingCount}
                 </div>
               </div>
             ` : `
-              <div style="padding: 20px; text-align: center; color: #64748b;">No sensor data available</div>
+              <div style="padding: 20px; text-align: center; color: #64748b;">No recent data</div>
             `}
             
             <div class="node-chart" id="chart-${device.deviceId}">
@@ -754,41 +568,28 @@
         `;
       }).join('');
       
-      // Load charts for all devices
       for (const device of devicesData) {
-        if (device.deviceId) {
-          await loadDeviceChart(device.deviceId);
-        }
+        await loadDeviceChart(device.deviceId);
       }
     }
     
     function renderAnalyticsCard(deviceId, analytics) {
-      // Get the reading for this device
-      const reading = latestReadings[deviceId];
-      const device = devicesData.find(d => d.deviceId === deviceId);
-      if (!reading || !device) return;
+      const grid = document.getElementById('analyticsGrid');
+      
+      if (analytics.message) {
+        const existingCard = document.getElementById(`analytics-${deviceId}`);
+        if (existingCard) existingCard.remove();
+        return;
+      }
       
       const predictions = analytics.predictions || {};
       const trends = analytics.trends || {};
-      const confidence = analytics.confidence || { level: 'low' };
-
-
+      
       const cardHtml = `
         <div class="node-card" id="analytics-${deviceId}">
           <div class="node-header">
             <div class="node-title">📊 ${deviceId} - Predictive Analytics</div>
-            <button onclick="showDetailedAnalytics('${deviceId}')" style="background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 0.7rem; cursor: pointer;">
-              View Details
-            </button>
-          </div>
-          
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 0.8rem;">
-            <div style="display: flex; align-items: center; gap: 4px;">
-              <div style="width: 8px; height: 8px; border-radius: 50%; background: ${device.status === 'online' ? '#10b981' : '#64748b'}"></div>
-              <span style="color: #94a3b8;">${device.status}</span>
-            </div>
-            <div style="color: #64748b;">|</div>
-            <div style="color: #94a3b8;">Last: ${device.lastSeen ? new Date(device.lastSeen).toLocaleTimeString() : 'Never'}</div>
+            <button onclick="showDetailedAnalytics('${deviceId}')" style="background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 0.7rem; cursor: pointer;">View Details</button>
           </div>
           
           <div style="margin-bottom: 16px;">
@@ -798,53 +599,41 @@
           </div>
           
           <div class="node-metrics">
-  <div class="metric" style="border-left-color: #f59e0b;" title="${trends.spoilageRisk?.explanation || 'No trend data'}">
-    <div class="metric-value">${getTrendIcon(trends.spoilageRisk?.value)} ${(trends.spoilageRisk?.value || 'STABLE').replace('_', ' ')}</div>
-    <div class="metric-label">Risk Trend</div>
-  </div>
-  <div class="metric" style="border-left-color: #10b981;" title="${predictions.reasoning?.join('. ') || 'Based on current trends'}">
-    <div class="metric-value">${predictions.predictedRisk || reading.spoilageRisk?.toFixed(1) || '--'}%</div>
-    <div class="metric-label">Predicted Risk</div>
-  </div>
-  <div class="metric" style="border-left-color: #8b5cf6;" title="${predictions.reasoning?.join('. ') || 'Based on current rate of change'}">
-    <div class="metric-value">${predictions.timeToCritical ? predictions.timeToCritical + 'h' : 'Stable'}</div>
-    <div class="metric-label">Time to Critical</div>
-  </div>
-  <div class="metric" style="border-left-color: #64748b;" title="${confidence.factors?.join('. ') || 'Based on data quality'}">
-    <div class="metric-value" style="text-transform: capitalize;">${confidence.level || 'low'}</div>
-    <div class="metric-label">Confidence</div>
-  </div>
-</div>
-          <div style="margin-top: 12px;">
-  <div style="font-size: 0.8rem; color: #94a3b8;">
-    <strong>Prediction Reasoning:</strong> ${predictions.reasoning?.[0] || 'Monitor conditions...'}
-  </div>
-  <div style="font-size: 0.7rem; color: #64748b; margin-top: 4px;">
-    Confidence factors: ${confidence.factors?.slice(0, 2).join(', ') || 'Limited data'}
-  </div>
-</div>
+            <div class="metric" style="border-left-color: #f59e0b;">
+              <div class="metric-value">${getTrendIcon(trends.spoilageRisk)} ${trends.spoilageRisk?.replace('_', ' ') || 'stable'}</div>
+              <div class="metric-label">Risk Trend</div>
+            </div>
+            <div class="metric" style="border-left-color: #10b981;">
+              <div class="metric-value">${predictions.predictedRisk || '--'}%</div>
+              <div class="metric-label">Predicted Risk</div>
+            </div>
+            <div class="metric" style="border-left-color: #8b5cf6;">
+              <div class="metric-value">${predictions.timeToCritical ? predictions.timeToCritical + 'h' : '--'}</div>
+              <div class="metric-label">Time to Critical</div>
+            </div>
+            <div class="metric" style="border-left-color: #64748b;">
+              <div class="metric-value" style="text-transform: capitalize;">${predictions.confidence || '--'}</div>
+              <div class="metric-label">Confidence</div>
+            </div>
+          </div>
+          
           <div style="margin-top: 12px;">
             <div style="font-size: 0.8rem; color: #94a3b8;">
-              <strong>Key Recommendation:</strong> ${analytics.recommendations?.[0] || 'Monitor conditions...'}
+              <strong>Key Recommendation:</strong> ${analytics.recommendations?.[0] || 'Monitoring conditions'}
             </div>
           </div>
         </div>
       `;
       
-      const analyticsGrid = document.getElementById('analyticsGrid');
       const existingCard = document.getElementById(`analytics-${deviceId}`);
-      
       if (existingCard) {
         existingCard.outerHTML = cardHtml;
       } else {
-        analyticsGrid.insertAdjacentHTML('beforeend', cardHtml);
+        grid.innerHTML = cardHtml + grid.innerHTML;
       }
     }
     
     function getTrendIcon(trend) {
-      if (!trend) return '📊';
-      
-      const trendLower = trend.toLowerCase();
       const icons = {
         'rising_rapidly': '🚨',
         'rising': '📈',
@@ -852,207 +641,123 @@
         'falling_rapidly': '💹',
         'stable': '➡️'
       };
-      
-      return icons[trendLower] || '📊';
+      return icons[trend] || '📊';
     }
     
     async function loadDeviceChart(deviceId) {
-  try {
-    const response = await fetch(`/api/history/${deviceId}?limit=50&hours=24`);
-    const rows = await response.json();
-    
-    const chartDiv = document.getElementById(`chart-${deviceId}`);
-    if (!chartDiv) return;
-    
-    if (!rows || rows.length === 0) {
-      chartDiv.innerHTML = '<div class="chart-empty">No historical data</div>';
-      return;
-    }
-    
-    const labels = rows.map(r => {
-      const date = r.ts_server ? new Date(r.ts_server) : new Date(r.timestamp);
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    });
-    
-    const temps = rows.map(r => r.temperature || 0);
-    const hums = rows.map(r => r.humidity || 0);
-    const risks = rows.map(r => r.spoilageRisk || 0);
-    const mqValues = rows.map(r => r.mq_value || 0); // NEW: Add MQ135 values
-    
-    chartDiv.innerHTML = '<canvas></canvas>';
-    const ctx = chartDiv.querySelector('canvas').getContext('2d');
-    
-    // Destroy existing chart if it exists
-    if (charts[deviceId]) {
-      charts[deviceId].destroy();
-    }
-    
-    charts[deviceId] = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [
-          {
-            label: 'Temperature °C',
-            data: temps,
-            borderColor: '#ef4444',
-            backgroundColor: 'rgba(239, 68, 68, 0.05)',
-            fill: true,
-            tension: 0.3,
-            borderWidth: 2,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            yAxisID: 'y'
+      try {
+        const response = await fetch(`/api/history/${deviceId}?limit=50&hours=24`);
+        const rows = await response.json();
+        
+        const chartDiv = document.getElementById(`chart-${deviceId}`);
+        
+        if (rows.length === 0) {
+          chartDiv.innerHTML = '<div class="chart-empty">No data available</div>';
+          return;
+        }
+        
+        const labels = rows.map(r => new Date(r.ts_server).toLocaleTimeString());
+        const temps = rows.map(r => r.temperature);
+        const hums = rows.map(r => r.humidity);
+        const risks = rows.map(r => r.spoilageRisk);
+        
+        chartDiv.innerHTML = '<canvas></canvas>';
+        const ctx = chartDiv.querySelector('canvas').getContext('2d');
+        
+        if (charts[deviceId]) {
+          charts[deviceId].destroy();
+        }
+        
+        charts[deviceId] = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'Temperature °C',
+                data: temps,
+                borderColor: '#ef4444',
+                backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 4
+              },
+              {
+                label: 'Humidity %',
+                data: hums,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 2,
+                yAxisID: 'y1',
+                pointRadius: 0,
+                pointHoverRadius: 4
+              },
+              {
+                label: 'Spoilage Risk %',
+                data: risks,
+                borderColor: '#f59e0b',
+                backgroundColor: 'rgba(245, 158, 11, 0.05)',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 2,
+                yAxisID: 'y2',
+                pointRadius: 0,
+                pointHoverRadius: 4
+              }
+            ]
           },
-          {
-            label: 'Humidity %',
-            data: hums,
-            borderColor: '#3b82f6',
-            backgroundColor: 'rgba(59, 130, 246, 0.05)',
-            fill: true,
-            tension: 0.3,
-            borderWidth: 2,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            yAxisID: 'y1'
-          },
-          {
-            label: 'MQ135 (Air Quality)',
-            data: mqValues, // NEW dataset
-            borderColor: '#8b5cf6',
-            backgroundColor: 'rgba(139, 92, 246, 0.05)',
-            fill: true,
-            tension: 0.3,
-            borderWidth: 2,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            yAxisID: 'y2'
-          },
-          {
-            label: 'Spoilage Risk %',
-            data: risks,
-            borderColor: '#f59e0b',
-            backgroundColor: 'rgba(245, 158, 11, 0.05)',
-            fill: true,
-            tension: 0.3,
-            borderWidth: 2,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            yAxisID: 'y3'
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: {
-            display: true,
-            labels: { color: '#94a3b8', font: { size: 11 }, usePointStyle: true }
-          },
-          tooltip: {
-            mode: 'index',
-            intersect: false,
-            backgroundColor: '#1e293b',
-            titleColor: '#f1f5f9',
-            bodyColor: '#cbd5e1',
-            borderColor: '#334155',
-            borderWidth: 1,
-            callbacks: {
-              label: function(context) {
-                let label = context.dataset.label || '';
-                if (label) {
-                  label += ': ';
-                }
-                if (context.parsed.y !== null) {
-                  if (label.includes('Temperature')) {
-                    label += context.parsed.y.toFixed(1) + '°C';
-                  } else if (label.includes('Humidity')) {
-                    label += context.parsed.y.toFixed(1) + '%';
-                  } else if (label.includes('MQ135')) {
-                    label += context.parsed.y.toFixed(0);
-                  } else if (label.includes('Risk')) {
-                    label += context.parsed.y.toFixed(1) + '%';
-                  }
-                }
-                return label;
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: {
+                display: true,
+                labels: { color: '#94a3b8', font: { size: 11 }, usePointStyle: true }
+              }
+            },
+            scales: {
+              x: {
+                display: true,
+                grid: { color: '#334155', drawBorder: false },
+                ticks: { color: '#94a3b8', maxRotation: 0, font: { size: 9 } }
+              },
+              y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                grid: { color: '#334155', drawBorder: false },
+                ticks: { color: '#94a3b8', font: { size: 9 } },
+                title: { display: true, text: 'Temperature (°C)', color: '#94a3b8' }
+              },
+              y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                grid: { drawOnChartArea: false, drawBorder: false },
+                ticks: { color: '#3b82f6', font: { size: 9 } },
+                title: { display: true, text: 'Humidity (%)', color: '#3b82f6' }
+              },
+              y2: {
+                type: 'linear',
+                display: false
               }
             }
           }
-        },
-        scales: {
-          x: {
-            display: true,
-            grid: { color: '#334155', drawBorder: false },
-            ticks: { color: '#94a3b8', maxRotation: 0, font: { size: 9 } }
-          },
-          y: {
-            type: 'linear',
-            display: true,
-            position: 'left',
-            grid: { color: '#334155', drawBorder: false },
-            ticks: { color: '#ef4444', font: { size: 9 } },
-            title: { 
-              display: true, 
-              text: 'Temperature (°C)', 
-              color: '#ef4444',
-              font: { size: 10 }
-            }
-          },
-          y1: {
-            type: 'linear',
-            display: true,
-            position: 'right',
-            grid: { drawOnChartArea: false, drawBorder: false },
-            ticks: { color: '#3b82f6', font: { size: 9 } },
-            title: { 
-              display: true, 
-              text: 'Humidity (%)', 
-              color: '#3b82f6',
-              font: { size: 10 }
-            }
-          },
-          y2: {
-            type: 'linear',
-            display: true,
-            position: 'right',
-            offset: true,
-            grid: { drawOnChartArea: false, drawBorder: false },
-            ticks: { color: '#8b5cf6', font: { size: 9 } },
-            title: { 
-              display: true, 
-              text: 'MQ135', 
-              color: '#8b5cf6',
-              font: { size: 10 }
-            }
-          },
-          y3: {
-            type: 'linear',
-            display: false
-          }
-        }
+        });
+        
+      } catch (error) {
+        console.error(`Error loading chart for ${deviceId}:`, error);
       }
-    });
-    
-  } catch (error) {
-    console.error(`Error loading chart for ${deviceId}:`, error);
-    const chartDiv = document.getElementById(`chart-${deviceId}`);
-    if (chartDiv) {
-      chartDiv.innerHTML = '<div class="chart-empty">Chart error</div>';
     }
-  }
-}
     
     function showDetailedAnalytics(deviceId) {
       const analytics = analyticsData[deviceId];
-      const device = devicesData.find(d => d.deviceId === deviceId);
-      const reading = latestReadings[deviceId];
-      
-      if (!analytics || !device || !reading) {
-        alert('No analytics data available for this device');
-        return;
-      }
+      if (!analytics) return;
       
       const modal = document.getElementById('analyticsModal');
       const title = document.getElementById('modalTitle');
@@ -1060,39 +765,8 @@
       
       title.textContent = `📈 Detailed Analytics - ${deviceId}`;
       
-      const predictions = analytics.predictions || {};
-      const trends = analytics.trends || {};
-      const patterns = analytics.patterns || {};
-      
       content.innerHTML = `
         <div style="display: grid; gap: 20px;">
-          <!-- Current Status -->
-          <div style="background: #0f172a; padding: 16px; border-radius: 8px;">
-            <h4 style="color: #f1f5f9; margin-bottom: 12px;">Current Status</h4>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
-              <div style="text-align: center; padding: 12px; background: #1e293b; border-radius: 6px;">
-                <div style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 4px;">Temperature</div>
-                <div style="font-size: 1.2rem; font-weight: bold; color: #ef4444;">${reading.temperature?.toFixed(1) || '--'}°C</div>
-              </div>
-              <div style="text-align: center; padding: 12px; background: #1e293b; border-radius: 6px;">
-                <div style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 4px;">Humidity</div>
-                <div style="font-size: 1.2rem; font-weight: bold; color: #3b82f6;">${reading.humidity?.toFixed(1) || '--'}%</div>
-              </div>
-              <div style="text-align: center; padding: 12px; background: #1e293b; border-radius: 6px;">
-                <div style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 4px;">Risk Level</div>
-                <div style="font-size: 1.2rem; font-weight: bold; color: ${reading.spoilageRisk > 70 ? '#ef4444' : reading.spoilageRisk > 40 ? '#f59e0b' : '#10b981'}">
-                  ${reading.spoilageRisk?.toFixed(1) || '--'}%
-                </div>
-              </div>
-              <div style="text-align: center; padding: 12px; background: #1e293b; border-radius: 6px;">
-                <div style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 4px;">Health</div>
-                <div style="font-size: 1.2rem; font-weight: bold; color: ${reading.grainHealth === 'CRITICAL' ? '#ef4444' : reading.grainHealth === 'WARNING' ? '#f59e0b' : '#10b981'}">
-                  ${reading.grainHealth || '--'}
-                </div>
-              </div>
-            </div>
-          </div>
-          
           <!-- Summary Section -->
           <div style="background: #0f172a; padding: 16px; border-radius: 8px;">
             <h4 style="color: #f1f5f9; margin-bottom: 12px;">Executive Summary</h4>
@@ -1108,17 +782,17 @@
             <h4 style="color: #f1f5f9; margin-bottom: 12px;">Predictive Analysis</h4>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
               <div style="text-align: center; padding: 16px; background: #1e293b; border-radius: 8px; border: 1px solid #334155;">
-                <div style="font-size: 1.8rem; font-weight: bold; color: #f59e0b; margin-bottom: 8px;">${predictions.predictedRisk || reading.spoilageRisk?.toFixed(1) || '--'}%</div>
+                <div style="font-size: 1.8rem; font-weight: bold; color: #f59e0b; margin-bottom: 8px;">${analytics.predictions?.predictedRisk || '--'}%</div>
                 <div style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase;">Predicted Risk</div>
               </div>
               <div style="text-align: center; padding: 16px; background: #1e293b; border-radius: 8px; border: 1px solid #334155;">
-                <div style="font-size: 1.8rem; font-weight: bold; color: ${predictions.timeToCritical ? '#ef4444' : '#10b981'}; margin-bottom: 8px;">
-                  ${predictions.timeToCritical ? predictions.timeToCritical + 'h' : 'Stable'}
+                <div style="font-size: 1.8rem; font-weight: bold; color: ${analytics.predictions?.timeToCritical ? '#ef4444' : '#10b981'}; margin-bottom: 8px;">
+                  ${analytics.predictions?.timeToCritical ? analytics.predictions.timeToCritical + 'h' : 'Stable'}
                 </div>
                 <div style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase;">Time to Critical</div>
               </div>
               <div style="text-align: center; padding: 16px; background: #1e293b; border-radius: 8px; border: 1px solid #334155;">
-                <div style="font-size: 1.8rem; font-weight: bold; color: #8b5cf6; margin-bottom: 8px; text-transform: capitalize;">${predictions.confidence || 'low'}</div>
+                <div style="font-size: 1.8rem; font-weight: bold; color: #8b5cf6; margin-bottom: 8px; text-transform: capitalize;">${analytics.predictions?.confidence || '--'}</div>
                 <div style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase;">Confidence Level</div>
               </div>
             </div>
@@ -1128,7 +802,7 @@
           <div style="background: #0f172a; padding: 16px; border-radius: 8px;">
             <h4 style="color: #f1f5f9; margin-bottom: 12px;">Trend Analysis</h4>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
-              ${Object.entries(trends).map(([key, value]) => `
+              ${Object.entries(analytics.trends || {}).map(([key, value]) => `
                 <div style="text-align: center; padding: 16px; background: #1e293b; border-radius: 8px; border: 1px solid #334155;">
                   <div style="font-size: 2rem; margin-bottom: 8px;">${getTrendIcon(value)}</div>
                   <div style="font-size: 0.9rem; color: #f1f5f9; text-transform: capitalize; margin-bottom: 4px;">${key.replace(/([A-Z])/g, ' $1')}</div>
@@ -1153,7 +827,7 @@
           <div style="background: #0f172a; padding: 16px; border-radius: 8px;">
             <h4 style="color: #f1f5f9; margin-bottom: 12px;">Detected Patterns</h4>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-              ${Object.entries(patterns).map(([pattern, detected]) => `
+              ${Object.entries(analytics.patterns || {}).map(([pattern, detected]) => `
                 <div style="text-align: center; padding: 16px; background: #1e293b; border-radius: 8px; border: 2px solid ${detected ? '#ef4444' : '#334155'};">
                   <div style="font-size: 1.5rem; margin-bottom: 8px;">${detected ? '🚨' : '✅'}</div>
                   <div style="font-size: 0.9rem; color: ${detected ? '#ef4444' : '#94a3b8'}; text-transform: capitalize; margin-bottom: 4px;">
@@ -1178,33 +852,19 @@
     
     function updateCriticalAlerts() {
       const readings = Object.values(latestReadings);
-      const critical = readings.filter(r => {
-        const risk = r.spoilageRisk || 0;
-        const health = r.grainHealth || '';
-        return risk > 70 || health === 'CRITICAL';
-      }).length;
+      const critical = readings.filter(r => (r.spoilageRisk || 0) > 70).length;
       
       const kpi = document.getElementById('criticalAlertsKpi');
       const detail = document.getElementById('criticalDetail');
       
       kpi.textContent = critical;
-      kpi.className = critical > 0 ? 'status-warning' : 'status-online';
       detail.textContent = critical > 0 ? `${critical} device${critical !== 1 ? 's' : ''} critical` : 'All systems normal';
     }
     
     function updateAvgHealth(readings) {
-      if (!readings || readings.length === 0) {
-        document.getElementById('avgHealthKpi').textContent = '-';
-        return;
-      }
+      if (readings.length === 0) return;
       
-      const validReadings = readings.filter(r => r && r.spoilageRisk != null);
-      if (validReadings.length === 0) {
-        document.getElementById('avgHealthKpi').textContent = '-';
-        return;
-      }
-      
-      const avgRisk = validReadings.reduce((sum, r) => sum + (r.spoilageRisk || 0), 0) / validReadings.length || 0;
+      const avgRisk = readings.reduce((sum, r) => sum + (r.spoilageRisk || 0), 0) / readings.length || 0;
       const status = avgRisk > 70 ? 'Critical' : avgRisk > 40 ? 'Warning' : 'Good';
       
       document.getElementById('avgHealthKpi').textContent = status;
@@ -1216,16 +876,7 @@
       document.getElementById('timestamp').textContent = now.toLocaleString();
     }
     
-    // Initialize dashboard when page loads
     document.addEventListener('DOMContentLoaded', initDashboard);
-    
-    // Close modal when clicking outside
-    window.addEventListener('click', (event) => {
-      const modal = document.getElementById('analyticsModal');
-      if (event.target === modal) {
-        closeAnalytics();
-      }
-    });
   </script>
 </body>
 </html>
