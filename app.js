@@ -274,6 +274,71 @@ app.get("/api/stats", (req, res) => {
 });
 
 
+function generateDetailedSummary(latest, trends, changes) {
+  const risk = latest.spoilageRisk || 0;
+  const temp = latest.temperature || 0;
+  const hum = latest.humidity || 0;
+  const mq = latest.mq_value || 0;
+  
+  const summaries = [];
+  
+  // Risk level summary
+  if (risk > 70) {
+    summaries.push(`🚨 CRITICAL RISK: ${risk.toFixed(1)}% spoilage risk. Immediate action required.`);
+  } else if (risk > 40) {
+    summaries.push(`⚠️ ELEVATED RISK: ${risk.toFixed(1)}% spoilage risk. Monitor closely.`);
+  } else {
+    summaries.push(`✓ ACCEPTABLE RISK: ${risk.toFixed(1)}% spoilage risk. Conditions stable.`);
+  }
+  
+  // Temperature analysis for potatoes
+  if (temp > 12) {
+    summaries.push(`🌡️ TEMPERATURE TOO HIGH: ${temp.toFixed(1)}°C exceeds ideal potato range (4-8°C).`);
+  } else if (temp < 4) {
+    summaries.push(`❄️ TEMPERATURE TOO LOW: ${temp.toFixed(1)}°C below ideal potato range. Risk of chilling injury.`);
+  } else {
+    summaries.push(`✓ TEMPERATURE OPTIMAL: ${temp.toFixed(1)}°C within ideal potato range (4-8°C).`);
+  }
+  
+  // Humidity analysis for potatoes
+  if (hum < 85) {
+    summaries.push(`💧 HUMIDITY TOO LOW: ${hum.toFixed(1)}% below ideal potato range (90-95%). Risk of weight loss.`);
+  } else if (hum > 95) {
+    summaries.push(`💦 HUMIDITY TOO HIGH: ${hum.toFixed(1)}% above ideal potato range. Risk of condensation.`);
+  } else {
+    summaries.push(`✓ HUMIDITY OPTIMAL: ${hum.toFixed(1)}% within ideal potato range (90-95%).`);
+  }
+  
+  // Air quality analysis
+  if (mq > 500) {
+    summaries.push(`☣️ POOR AIR QUALITY: MQ135 reading ${mq.toFixed(0)} indicates high gas levels.`);
+  } else if (mq > 300) {
+    summaries.push(`⚠️ MODERATE AIR QUALITY: MQ135 reading ${mq.toFixed(0)} indicates elevated gas levels.`);
+  }
+  
+  // Dew point analysis
+  if (latest.dewPoint && (temp - latest.dewPoint) < 2) {
+    summaries.push(`💧 CONDENSATION RISK: Temperature-dew point difference is ${(temp - latest.dewPoint).toFixed(1)}°C (<2°C threshold).`);
+  }
+  
+  // Trend analysis
+  const tempTrend = trends.temperature?.value || 'STABLE';
+  const humTrend = trends.humidity?.value || 'STABLE';
+  const riskTrend = trends.spoilageRisk?.value || 'STABLE';
+  
+  if (riskTrend.includes('RISING')) {
+    summaries.push(`📈 RISK TRENDING UPWARD: Spoilage risk is ${riskTrend.toLowerCase().replace('_', ' ')}.`);
+  }
+  
+  if (tempTrend.includes('RISING') && temp > 8) {
+    summaries.push(`📈 TEMPERATURE RISING: Temperature trend could lead to increased spoilage risk.`);
+  }
+  
+  return summaries;
+}
+
+
+
 
 // Analytics calculation for dashboard
 // Enhanced analytics with explanations
@@ -384,7 +449,76 @@ function generateDashboardAnalytics(rows) {
   };
 }
 
-// New helper functions for explanations:
+// Enhanced summary function with detailed analysis
+
+
+
+
+
+// Generate prioritized recommendations
+function generatePrioritizedRecommendations(latest, trends, patterns, predictedRisk) {
+  const recommendations = [];
+  const temp = latest.temperature || 0;
+  const hum = latest.humidity || 0;
+  const mq = latest.mq_value || 0;
+  const risk = latest.spoilageRisk || 0;
+  
+  // Priority 1: Critical conditions (immediate action)
+  if (temp < 3) {
+    recommendations.push("🚨 PRIORITY 1: FREEZING TEMPERATURE (<3°C). Immediately increase temperature to prevent potato freezing damage.");
+  }
+  
+  if (risk > 70) {
+    recommendations.push("🚨 PRIORITY 1: CRITICAL SPOILAGE RISK (>70%). Ventilate immediately and inspect potatoes for spoilage.");
+  }
+  
+  if (mq > 600) {
+    recommendations.push("🚨 PRIORITY 1: VERY POOR AIR QUALITY (MQ135 >600). Ventilate immediately - high gas concentration detected.");
+  }
+  
+  // Priority 2: Elevated risk conditions (urgent attention)
+  if (temp > 12) {
+    recommendations.push("⚠️ PRIORITY 2: Temperature too high (>12°C). Increase cooling or ventilation within 2 hours.");
+  }
+  
+  if (temp < 4 && temp >= 3) {
+    recommendations.push("⚠️ PRIORITY 2: Near freezing (3-4°C). Increase temperature to 4-8°C range within 4 hours.");
+  }
+  
+  if (hum < 85) {
+    recommendations.push("⚠️ PRIORITY 2: Humidity too low (<85%). Increase humidity to prevent potato shriveling.");
+  }
+  
+  if (hum > 95) {
+    recommendations.push("⚠️ PRIORITY 2: Humidity very high (>95%). Check for condensation and increase ventilation.");
+  }
+  
+  // Priority 3: Maintenance actions (preventive)
+  if (latest.dewPoint && (temp - latest.dewPoint) < 2) {
+    recommendations.push("💧 PRIORITY 3: Condensation risk. Monitor for wet spots and ensure proper air circulation.");
+  }
+  
+  if (mq > 300 && mq <= 600) {
+    recommendations.push("⚠️ PRIORITY 3: Moderate air quality. Schedule ventilation within 12 hours.");
+  }
+  
+  // Priority 4: Monitoring recommendations
+  const riskTrend = trends.spoilageRisk?.value || 'STABLE';
+  if (riskTrend.includes('RISING') && risk > 30) {
+    recommendations.push("📈 PRIORITY 4: Risk trending upward. Increase monitoring frequency to every 2 hours.");
+  }
+  
+  // Default recommendation if none above apply
+  if (recommendations.length === 0) {
+    recommendations.push("✅ PRIORITY 4: Conditions optimal. Continue regular monitoring schedule.");
+  }
+  
+  return recommendations.slice(0, 5); // Return top 5 recommendations
+}
+
+
+
+
 
 function getTemperatureTrendExplanation(trend, change, currentTemp) {
   const trendLabel = getTrendLabel(trend);
@@ -623,6 +757,7 @@ function detectAcceleratingTrend(data) {
   
   return Math.abs(secondTrend) > Math.abs(firstTrend) * 1.5;
 }
+
 
 function detectSpike(data, threshold = 0.15) {
   if (data.length < 3) return false;
